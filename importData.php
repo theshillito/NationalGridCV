@@ -71,8 +71,8 @@ while($periodicDate->format('m') <= $endDate->format('m')){
         '<reqObject>'.
             '<LatestFlag>N</LatestFlag>'.
             '<ApplicableForFlag>Y</ApplicableForFlag>'.
-            '<ToDate>'.$periodicDate->format('Y-m-d').'</ToDate>'.
-            '<FromDate>'.strtotime($periodicDate->format('Y-m-d').' +1 month').'</FromDate>'.
+            '<FromDate>'.$periodicDate->format('Y-m-d').'</FromDate>'.
+            '<ToDate>'.date('Y-m-d',strtotime($periodicDate->format('Y-m-d').' +1 month')).'</ToDate>'.
             '<DateType>gasday</DateType>'.
             '<PublicationObjectNameList>';
             foreach($locationsArray as $singleLocation){
@@ -109,7 +109,7 @@ while($periodicDate->format('m') <= $endDate->format('m')){
     $parser = simplexml_load_string($response2);
 
     //now we have the data from the API, we need to import into our database
-    
+
 
     //add a month to the periodic date
     $periodicDate->add(new DateInterval("P1M"));
