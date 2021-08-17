@@ -1,4 +1,7 @@
 <?php
+// ini_set('display_errors', 1);
+// ini_set('display_startup_errors', 1);
+// error_reporting(E_ALL);
 /*
     This script will connect to the MySQL/MariaDB database and check if the "nationalgridcv" schema exists, and create it if not. 
     Then it will create (if not already existing) two tables, `areas` and `dailyvalues`. 
@@ -19,10 +22,10 @@ if ($mysqli->connect_error) {
 //We're connected, now we create the schema/database
 
 $sql_dbcreate = "CREATE DATABASE nationalgridcv";
-if ($conn->query($sql_dbcreate) === TRUE) {
+if ($mysqli->query($sql_dbcreate) === TRUE) {
   echo "Database created successfully";
 } else {
-  die("Error creating database: " . $conn->error);
+  die("Error creating database: " . $mysqli->error);
 }
 
 //and connect to it
@@ -43,7 +46,8 @@ $sql_tblcreate_areas = "CREATE TABLE `areas` (
   `areaName` varchar(45) NOT NULL,
   `subdivision` varchar(45) DEFAULT NULL,
   PRIMARY KEY (`areaID`),
-  UNIQUE KEY `id_UNIQUE` (`areaID`)
+  UNIQUE KEY `id_UNIQUE` (`areaID`),
+  UNIQUE KEY `dataItem_UNIQUE` (`dataItem`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 ";
 $mysqli->query($sql_tblcreate_areas);

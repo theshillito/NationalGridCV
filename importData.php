@@ -84,7 +84,7 @@ while($periodicDate->format('m') <= $endDate->format('m')){
             '<LatestFlag>N</LatestFlag>'.
             '<ApplicableForFlag>Y</ApplicableForFlag>'.
             '<FromDate>'.$periodicDate->format('Y-m-d').'</FromDate>'.
-            '<ToDate>'.date('Y-m-d',strtotime($periodicDate->format('Y-m-d').' +1 month')).'</ToDate>'.
+            '<ToDate>'.date('Y-m-d',strtotime($periodicDate->format('Y-m-t'))).'</ToDate>'.
             '<DateType>gasday</DateType>'.
             '<PublicationObjectNameList>';
             foreach($locationsArray as $singleLocation){
@@ -122,12 +122,12 @@ while($periodicDate->format('m') <= $endDate->format('m')){
 
     //now we have the data from the API, we need to import into our database
     //since the data is grouped by location, that actually means we can add the location first and use the generated ID from that before adding all the values. Handy!
-
-    $sql_insert_location = $mysqli->prepare("INSERT INTO areas (dataItem, areaName, subDivision) VALUES (?, ?, ?) ");
+    //However, since we run this every loop, we only want to add new values, so we're adding "IGNORE" to the statement so any duplicate values are skipped.
+    $sql_insert_location = $mysqli->prepare("INSERT IGNORE INTO areas (dataItem, areaName, subDivision) VALUES (?, ?, ?) ");
     $sql_insert_location->bind_param("sss", $dataItem, $areaName, $subDivision);
 
     $sql_insert_dailyvalue = $mysqli->prepare("INSERT INTO dailyvalues (areaID, applicableFor, calorificValue) VALUES (?, ?, ?) ");
-    $sql_insert_dailyvalue->bind_param("sss", $areaID, $applicableFor, $calorificValue);
+    $sql_insert_dailyvalue->bind_param("isd", $areaID, $applicableFor, $calorificValue);
 
     //loop through each location
     foreach($parser->GetPublicationDataWMResponse->GetPublicationDataWMResult->CLSMIPIPublicationObjectBE as $locationKey=>$details){
@@ -135,7 +135,7 @@ while($periodicDate->format('m') <= $endDate->format('m')){
         $dataItem = $details->PublicationObjectName;
         //we now split the dataitem up into parts using a regular expression
         $dividedArea = array();
-        $areaRegex = "Calorific Value, (\w*)(\((\w*)\))*";
+        $areaRegex = "/Calorific Value, (\w*)(\((\w*)\))*/";
         preg_match($areaRegex, $dataItem, $dividedArea); //this puts the regex matches into $dividedArea in the bracketed groups
         //$dividedArea[0] contains the full text, [1] contains the location , such as "LDZ" or "Stranraer", [2] is optional if a subdivision is found and includes the brackets, [3] is without the brackets
 
@@ -145,13 +145,23 @@ while($periodicDate->format('m') <= $endDate->format('m')){
 
         //now we've inserted an area, we want the key/ID for the record we just inserted
         $areaID = $sql_insert_location->insert_id;
+        if($areaID===0){
+            //the area already existed, so we need to SELECT the areaID
+            $sql_selectAreaID = $mysqli->prepare("SELECT areaID FROM areas WHERE dataItem=?");
+            $sql_selectAreaID->bind_param("s",$dataItem);
+            $sql_selectAreaID->execute();
+            $sql_selectAreaID->bind_result($areaID);
+            $sql_selectAreaID->fetch();
+            $sql_selectAreaID->free_result();
+        }
 
         //And now we loop through and insert the individual records
         foreach($details->PublicationObjectData->CLSPublicationObjectDataBE as $recordKey=>$dailyValueDetails){
             
-            $applicableFor = $dailyValueDetails->ApplicableFor;
+            $applicableForDateTime = new DateTime($dailyValueDetails->ApplicableFor);
+            $applicableFor = $applicableForDateTime->format('Y-m-d');
             $calorificValue = $dailyValueDetails->Value;
-            $sql_insert_dailyvalue->execute();
+            $sql_insert_dailyvalue->execute() or die($sql_insert_dailyvalue->error);
 
         }
     }   
