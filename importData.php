@@ -1,7 +1,7 @@
 <?php
-ini_set('display_errors', 1);
-ini_set('display_startup_errors', 1);
-error_reporting(E_ALL);
+// ini_set('display_errors', 1);
+// ini_set('display_startup_errors', 1);
+// error_reporting(E_ALL);
 /*
     The task spec requires me to pull data from http://mip-prd-web.azurewebsites.net/DataItemExplorer and specificly the "Calorific Value" subset of data.
     The page lets you generate CSV or XML files based on some critera, or a URL to provide you an HTML table directly. The spec wants the data "for this year so far", 
