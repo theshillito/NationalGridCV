@@ -34,6 +34,18 @@ error_reporting(E_ALL);
     </soap:Body>
     </soap:Envelope>
 */ 
+
+//we're gonna open the connection to the MySQL server here, as always replace with your credentials or have them in enviroment variables and remove this bit
+$dbuser = "databaseuser";
+$dbpass = "databasepass";
+$dbhost = "localhost";
+
+$mysqli = new mysqli($dbhost, $dbuser, $dbpass, 'nationalgridcv'); //notice that we're connecting to the specific database/schema here. Adjust if your schema is different.
+
+if ($mysqli->connect_error) {
+    die("Connection failed: " . $mysqli->connect_error);
+} 
+
 //we need to add all locations to the list. comment out the ones you don't want
 $locationsArray = array(
             "Calorific Value, Campbeltown",
@@ -109,7 +121,40 @@ while($periodicDate->format('m') <= $endDate->format('m')){
     $parser = simplexml_load_string($response2);
 
     //now we have the data from the API, we need to import into our database
+    //since the data is grouped by location, that actually means we can add the location first and use the generated ID from that before adding all the values. Handy!
 
+    $sql_insert_location = $mysqli->prepare("INSERT INTO areas (dataItem, areaName, subDivision) VALUES (?, ?, ?) ");
+    $sql_insert_location->bind_param("sss", $dataItem, $areaName, $subDivision);
+
+    $sql_insert_dailyvalue = $mysqli->prepare("INSERT INTO dailyvalues (areaID, applicableFor, calorificValue) VALUES (?, ?, ?) ");
+    $sql_insert_dailyvalue->bind_param("sss", $areaID, $applicableFor, $calorificValue);
+
+    //loop through each location
+    foreach($parser->GetPublicationDataWMResponse->GetPublicationDataWMResult->CLSMIPIPublicationObjectBE as $locationKey=>$details){
+        
+        $dataItem = $details->PublicationObjectName;
+        //we now split the dataitem up into parts using a regular expression
+        $dividedArea = array();
+        $areaRegex = "Calorific Value, (\w*)(\((\w*)\))*";
+        preg_match($areaRegex, $dataItem, $dividedArea); //this puts the regex matches into $dividedArea in the bracketed groups
+        //$dividedArea[0] contains the full text, [1] contains the location , such as "LDZ" or "Stranraer", [2] is optional if a subdivision is found and includes the brackets, [3] is without the brackets
+
+        $areaName = $dividedArea[1];
+        $subDivision = array_key_exists(3,$dividedArea)===true ? $dividedArea[3] : NULL; //if no subdivision, we set this to null
+        $sql_insert_location->execute();
+
+        //now we've inserted an area, we want the key/ID for the record we just inserted
+        $areaID = $sql_insert_location->insert_id;
+
+        //And now we loop through and insert the individual records
+        foreach($details->PublicationObjectData->CLSPublicationObjectDataBE as $recordKey=>$dailyValueDetails){
+            
+            $applicableFor = $dailyValueDetails->ApplicableFor;
+            $calorificValue = $dailyValueDetails->Value;
+            $sql_insert_dailyvalue->execute();
+
+        }
+    }   
 
     //add a month to the periodic date
     $periodicDate->add(new DateInterval("P1M"));
